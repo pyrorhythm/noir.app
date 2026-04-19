@@ -1,17 +1,24 @@
-//
-//  noirApp.swift
-//  noir
-//
-//  Created by Алексей Печенин on 18.4.2026.
-//
-
 import SwiftUI
 
 @main
-struct noirApp: App {
+struct NoirApp: App {
+    @State private var barManager: BarManager
+    @State private var settings = SettingsStore()
+    @State private var wmDetector = WindowManagerDetector()
+
+    init() {
+        let manager = BarManager()
+        manager.widgetRegistry.register { SpacerWidget() }
+        manager.widgetRegistry.register { ClockWidget() }
+        self._barManager = State(initialValue: manager)
+    }
+
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        Settings {
+            SettingsView()
+                .environment(barManager)
+                .environment(settings)
+                .environment(wmDetector)
         }
     }
 }
