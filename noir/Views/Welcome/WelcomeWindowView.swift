@@ -1,10 +1,9 @@
 import SwiftUI
 
 struct WelcomeWindowView: View {
-    @Environment(BarManager.self) var barManager
-    @Environment(SettingsStore.self) var settings
     @Environment(\.dismiss) private var dismiss
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    var onComplete: (() -> Void)?
     
     @State private var currentPage = 0
     
@@ -47,7 +46,11 @@ struct WelcomeWindowView: View {
                         }
                     } else {
                         hasCompletedOnboarding = true
-                        dismiss()
+                        if let onComplete {
+                            onComplete()
+                        } else {
+                            dismiss()
+                        }
                     }
                 } label: {
                     Text(currentPage < 2 ? "Continue" : "Get Started")
@@ -67,4 +70,11 @@ struct WelcomeWindowView: View {
             }
         }
     }
+}
+
+#Preview("Welcome") {
+    NoirPreviewEnvironment().inject(
+        into: WelcomeWindowView()
+            .frame(width: 560, height: 420)
+    )
 }

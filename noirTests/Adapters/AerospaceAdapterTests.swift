@@ -3,6 +3,7 @@ import Foundation
 @testable import noir
 
 @Suite("AerospaceAdapter")
+@MainActor
 struct AerospaceAdapterTests {
     @Test("Adapter has correct name")
     func name() {
@@ -21,5 +22,22 @@ struct AerospaceAdapterTests {
     func noWorkspaceStream() {
         let adapter = AerospaceAdapter(socketPath: "/tmp/nonexistent-aerospace-socket-\(UUID().uuidString)")
         #expect(adapter.onWorkspaceChange == nil)
+    }
+
+    @Test("Visible window output is parsed")
+    func parsesVisibleWindows() {
+        let windows = AerospaceAdapter.parseVisibleWindows("""
+        42|Safari|Docs|2|true
+        99|Xcode|Noir|1|false
+        invalid
+        """)
+
+        #expect(windows.count == 2)
+        #expect(windows[0].id == "42")
+        #expect(windows[0].appName == "Safari")
+        #expect(windows[0].title == "Docs")
+        #expect(windows[0].workspace == 2)
+        #expect(windows[0].isFocused == true)
+        #expect(windows[1].isFocused == false)
     }
 }

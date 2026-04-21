@@ -1,0 +1,43 @@
+name: Release Artifact
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Package macOS App
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+
+      - name: Install just
+        run: |
+          brew list just >/dev/null 2>&1 || brew install just
+          just --version
+
+      - name: Run CI checks
+        run: just ci
+
+      - name: Package release app
+        run: just package
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: noir-macos
+          path: build/Artifacts/noir-macos.zip
+          if-no-files-found: error

@@ -3,6 +3,7 @@ import Testing
 @testable import noir
 
 @Suite("LayoutStore")
+@MainActor
 struct LayoutStoreTests {
     @Test("Save and load layout config round-trip")
     func roundTrip() throws {

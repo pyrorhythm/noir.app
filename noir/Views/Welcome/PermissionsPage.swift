@@ -34,7 +34,7 @@ struct PermissionsPage: View {
                     .padding(.horizontal, 40)
                 
                 Button {
-                    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                    let options = ["AXTrustedCheckOptionPrompt" as CFString: true] as CFDictionary
                     let trusted = AXIsProcessTrustedWithOptions(options)
                     isGranted = trusted
                 } label: {

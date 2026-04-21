@@ -20,6 +20,7 @@ struct AnotherWidget: NoirWidget {
 }
 
 @Suite("WidgetRegistry")
+@MainActor
 struct WidgetRegistryTests {
     @Test("Register and create widget by type name")
     func registerAndCreate() {
@@ -48,6 +49,16 @@ struct WidgetRegistryTests {
         let w2 = registry.createWidget(ofType: "AnotherWidget", size: .medium)
         #expect(w1 != nil)
         #expect(w2 != nil)
+    }
+
+    @Test("Registered widgets expose descriptors for settings UI")
+    func registeredWidgetDescriptors() {
+        let registry = WidgetRegistry()
+        registry.register { TestWidget() }
+        registry.register { AnotherWidget() }
+
+        #expect(registry.registeredWidgets.map(\.typeName) == ["AnotherWidget", "TestWidget"])
+        #expect(registry.registeredWidgets.map(\.systemImage) == ["circle", "star"])
     }
 
     @Test("Create widget with different size")

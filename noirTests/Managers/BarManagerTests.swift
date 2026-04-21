@@ -3,11 +3,12 @@ import Foundation
 @testable import noir
 
 @Suite("BarManager")
+@MainActor
 struct BarManagerTests {
     @Test("Initial state has default layout")
     func initialState() {
         let manager = BarManager()
-        #expect(manager.layout.barHeight == 28)
+        #expect(manager.barHeight == 28)
         #expect(manager.isEditing == false)
         #expect(manager.zones == [.top, .bottom])
     }
@@ -113,5 +114,43 @@ struct BarManagerTests {
         manager.addWidget(widgetC)
         let ordered = manager.widgets(for: .top)
         #expect(ordered.map(\.id) == [idB, idC, idA])
+    }
+
+    @Test("Layout mutations publish the persisted layout")
+    func layoutMutationsPublish() {
+        let settings = SettingsStore(defaults: UserDefaults(suiteName: "NoirBarManagerTests-\(UUID().uuidString)")!)
+        let manager = BarManager(settings: settings)
+
+        var published: LayoutConfig?
+        manager.onLayoutChange = { layout in
+            published = layout
+        }
+
+        let config = WidgetConfig(id: UUID(), type: "Clock", size: .medium, zone: .top, group: .trailing, index: 0, settings: [:])
+        manager.addWidget(config)
+
+        #expect(published?.zones[.top]?.widgets == [config])
+    }
+
+    @Test("Applying a saved layout does not publish a new mutation")
+    func applyDoesNotPublish() {
+        let manager = BarManager()
+        var publishCount = 0
+        manager.onLayoutChange = { _ in
+            publishCount += 1
+        }
+
+        let config = LayoutConfig(
+            zones: [
+                .top: ZoneConfig(widgets: [
+                    WidgetConfig(id: UUID(), type: "Clock", size: .medium, zone: .top, group: .trailing, index: 0, settings: [:])
+                ]),
+                .bottom: ZoneConfig(widgets: [])
+            ]
+        )
+
+        manager.apply(layoutConfig: config)
+        #expect(manager.widgets(for: .top) == config.zones[.top]?.widgets)
+        #expect(publishCount == 0)
     }
 }

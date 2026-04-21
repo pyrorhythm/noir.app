@@ -3,13 +3,14 @@ import SwiftUI
 struct WidgetContainerView: View {
     let config: WidgetConfig
     @Environment(BarManager.self) var barManager
+    @Environment(SettingsStore.self) var settings
     @Environment(WidgetRegistry.self) var registry
 
     var body: some View {
         Group {
             if let widget = registry.createWidget(ofType: config.type, size: config.size) {
                 AnyNoirWidgetView(widget: widget)
-                    .frame(height: barManager.layout.barHeight - 4)
+                    .frame(height: CGFloat(settings.barAppearance.height) - 4)
             } else {
                 Image(systemName: "questionmark.square")
                     .foregroundStyle(.secondary)
@@ -51,4 +52,40 @@ extension View {
             self
         }
     }
+}
+
+#Preview("Clock Widget") {
+    let config = WidgetConfig(
+        id: UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!,
+        type: "Clock",
+        size: .medium,
+        zone: .top,
+        group: .trailing,
+        index: 0,
+        settings: [:]
+    )
+
+    NoirPreviewEnvironment().inject(
+        into: WidgetContainerView(config: config)
+            .padding()
+            .background(.black)
+    )
+}
+
+#Preview("Widget Editing") {
+    let config = WidgetConfig(
+        id: UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!,
+        type: "Settings",
+        size: .small,
+        zone: .top,
+        group: .trailing,
+        index: 0,
+        settings: [:]
+    )
+
+    NoirPreviewEnvironment(isEditing: true).inject(
+        into: WidgetContainerView(config: config)
+            .padding()
+            .background(.black)
+    )
 }

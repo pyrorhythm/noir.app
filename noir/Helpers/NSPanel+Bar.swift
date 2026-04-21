@@ -8,15 +8,14 @@ extension NSPanel {
             backing: .buffered,
             defer: false
         )
-        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)) + 1)
-        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        panel.level = .statusBar
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
         panel.hasShadow = false
-        panel.ignoresMouseEvents = false
+        panel.ignoresMouseEvents = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.becomesKeyOnlyIfNeeded = true
-        panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         return panel
     }

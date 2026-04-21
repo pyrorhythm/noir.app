@@ -3,6 +3,7 @@ import Testing
 @testable import noir
 
 @Suite("BarZone")
+@MainActor
 struct BarZoneTests {
     @Test("BarZone has top and bottom cases")
     func barZoneCases() {

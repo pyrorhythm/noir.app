@@ -3,6 +3,7 @@ import Testing
 @testable import noir
 
 @Suite("WidgetConfig")
+@MainActor
 struct WidgetConfigTests {
     @Test("WidgetSize has small, medium, large")
     func widgetSizeCases() {

@@ -32,3 +32,23 @@ struct AnyNotchPresentableView: View {
         AnyView(presenter.notchContent)
     }
 }
+
+#Preview("Dynamic Notch Idle") {
+    NoirPreviewEnvironment().inject(
+        into: DynamicNotchView()
+            .frame(width: 220, height: 48)
+            .padding()
+            .background(.black)
+    )
+}
+
+#Preview("Dynamic Notch Expanded") {
+    NoirPreviewEnvironment(
+        notchPresenter: SystemNotchPresenter(kind: .volume, value: 1)
+    ).inject(
+        into: DynamicNotchView()
+            .frame(width: 260, height: 64)
+            .padding()
+            .background(.black)
+    )
+}

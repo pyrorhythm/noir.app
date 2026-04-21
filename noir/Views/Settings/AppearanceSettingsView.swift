@@ -6,14 +6,38 @@ struct AppearanceSettingsView: View {
     var body: some View {
         Form {
             Section("Bar") {
-                Slider(value: Bindable(settings).barHeight, in: 24...36, step: 2) {
-                    Text("Bar Height")
-                }
-                Slider(value: Bindable(settings).barOpacity, in: 0.5...1.0, step: 0.05) {
-                    Text("Opacity")
+                ForEach(BarAppearance.controls) { control in
+                    LabeledContent {
+                        HStack {
+                            Slider(value: binding(for: control), in: control.range, step: control.step)
+                            Text(settings.barAppearance[keyPath: control.value], format: control.format)
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                                .frame(width: 48, alignment: .trailing)
+                        }
+                    } label: {
+                        Label(control.title, systemImage: control.systemImage)
+                    }
                 }
             }
         }
         .formStyle(.grouped)
     }
+
+    private func binding(for control: BarAppearanceControl) -> Binding<Double> {
+        Binding {
+            settings.barAppearance[keyPath: control.value]
+        } set: { newValue in
+            var appearance = settings.barAppearance
+            appearance[keyPath: control.value] = newValue
+            settings.barAppearance = appearance
+        }
+    }
+}
+
+#Preview("Appearance Settings") {
+    NoirPreviewEnvironment().inject(
+        into: AppearanceSettingsView()
+            .frame(width: 420, height: 240)
+    )
 }

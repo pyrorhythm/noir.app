@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 @Observable
 final class NotchManager {
     private(set) var activePresenter: (any NotchPresentable)?
@@ -13,11 +14,12 @@ final class NotchManager {
     }
 
     func request(_ widget: some NotchPresentable, value: Double = 0, icon: String? = nil) {
-        if let current = activePresenter,
-           widget.notchPriority >= current.notchPriority {
+        if let current = activePresenter {
+            guard widget.notchPriority >= current.notchPriority else { return }
             dismissCurrent()
         }
 
+        dismissTask?.cancel()
         activePresenter = widget
         withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
             isExpanded = true

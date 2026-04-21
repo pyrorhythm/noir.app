@@ -3,6 +3,7 @@ import Testing
 @testable import noir
 
 @Suite("NotchPriority")
+@MainActor
 struct NotchPriorityTests {
     @Test("NotchPriority ordering")
     func priorityOrdering() {

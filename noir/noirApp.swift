@@ -2,31 +2,26 @@ import SwiftUI
 
 @main
 struct NoirApp: App {
-    @State private var barManager: BarManager
-    @State private var settings = SettingsStore()
-    @State private var wmDetector = WindowManagerDetector()
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var coordinator: AppCoordinator
 
     init() {
-        let manager = BarManager()
-        manager.widgetRegistry.register { SpacerWidget() }
-        manager.widgetRegistry.register { ClockWidget() }
-        self._barManager = State(initialValue: manager)
+        let coordinator = AppCoordinator()
+        self._coordinator = State(initialValue: coordinator)
+        Task { @MainActor in
+            coordinator.start()
+        }
     }
 
     var body: some Scene {
         MenuBarExtra("Noir", systemImage: "circle.fill") {
-            MenuBarExtraContent()
-                .environment(barManager)
-                .environment(settings)
-                .environment(wmDetector)
+            MenuBarView()
+                .noirEnvironment(coordinator)
         }
         .menuBarExtraStyle(.window)
 
         WindowGroup(id: "welcome") {
             WelcomeWindowView()
-                .environment(barManager)
-                .environment(settings)
+                .noirEnvironment(coordinator)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 560, height: 420)
@@ -34,23 +29,7 @@ struct NoirApp: App {
 
         Settings {
             SettingsView()
-                .environment(barManager)
-                .environment(settings)
-                .environment(wmDetector)
+                .noirEnvironment(coordinator)
         }
-    }
-}
-
-struct MenuBarExtraContent: View {
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        MenuBarView()
-            .task {
-                if !hasCompletedOnboarding {
-                    openWindow(id: "welcome")
-                }
-            }
     }
 }

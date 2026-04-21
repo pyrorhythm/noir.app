@@ -27,6 +27,7 @@ struct MockNotchWidget: NotchPresentable {
 }
 
 @Suite("NotchManager")
+@MainActor
 struct NotchManagerTests {
     @Test("Initial state is not expanded")
     func initialState() {
@@ -55,6 +56,20 @@ struct NotchManagerTests {
         #expect(manager.activePresenter?.displayName == "MockNotch")
 
         manager.request(highWidget)
+        #expect(manager.isExpanded == true)
+    }
+
+    @Test("Lower priority does not preempt current presenter")
+    func lowerPriorityDoesNotPreempt() async {
+        let manager = NotchManager(hasNotch: true)
+        let highWidget = MockNotchWidget(priority: .high, duration: 0)
+        let lowWidget = MockNotchWidget(priority: .low, duration: 0)
+
+        manager.request(highWidget)
+        let activeID = manager.activePresenter?.id
+
+        manager.request(lowWidget)
+        #expect(manager.activePresenter?.id == activeID)
         #expect(manager.isExpanded == true)
     }
 

@@ -3,26 +3,29 @@ import Foundation
 @testable import noir
 
 @Suite("Smoke Tests")
+@MainActor
 struct SmokeTests {
     @Test("BarManager creates with default state")
     func barManagerDefaults() {
         let manager = BarManager()
         #expect(manager.zones == [.top, .bottom])
         #expect(manager.isEditing == false)
-        #expect(manager.layout.barHeight == 28)
+        #expect(manager.barHeight == 28)
     }
 
     @Test("WidgetRegistry registers and creates widgets")
     func widgetRegistry() {
         let registry = WidgetRegistry()
-        registry.register { SpacerWidget() }
-        registry.register { ClockWidget() }
+        NoirWidgetCatalog.registerDefaults(in: registry)
 
         let spacer = registry.createWidget(ofType: "Spacer", size: .small)
         #expect(spacer != nil)
 
         let clock = registry.createWidget(ofType: "Clock", size: .medium)
         #expect(clock != nil)
+
+        let settings = registry.createWidget(ofType: "Settings", size: .small)
+        #expect(settings != nil)
     }
 
     @Test("NotchManager initial state")

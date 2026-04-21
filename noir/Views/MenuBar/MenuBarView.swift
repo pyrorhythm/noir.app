@@ -2,8 +2,8 @@ import SwiftUI
 
 struct MenuBarView: View {
     @Environment(BarManager.self) var barManager
-    @Environment(SettingsStore.self) var settings
     @Environment(WindowManagerDetector.self) var wmDetector
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         GlassEffectContainer {
@@ -22,9 +22,14 @@ struct MenuBarView: View {
                 }
                 
                 Divider()
-                
+
+                connectionStatus
+
                 VStack(spacing: 8) {
-                    SettingsLink {
+                    Button {
+                        NSApp.activate(ignoringOtherApps: true)
+                        openSettings()
+                    } label: {
                         Label("Open Settings", systemImage: "gear")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -54,4 +59,29 @@ struct MenuBarView: View {
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
         }
     }
+
+    private var connectionStatus: some View {
+        HStack {
+            Image(systemName: wmDetector.connectionState == .connected ? "checkmark.circle.fill" : "circle.dashed")
+                .foregroundStyle(wmDetector.connectionState == .connected ? .green : .secondary)
+            Text(wmDetector.detectedWM?.name ?? "No window manager")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+    }
+}
+
+#Preview("Menu Bar Extra") {
+    NoirPreviewEnvironment().inject(
+        into: MenuBarView()
+            .padding()
+    )
+}
+
+#Preview("Menu Bar Extra Editing") {
+    NoirPreviewEnvironment(isEditing: true).inject(
+        into: MenuBarView()
+            .padding()
+    )
 }

@@ -1,11 +1,17 @@
 import Foundation
+import CoreGraphics
 
 final class AerospaceAdapter: WindowManagerProtocol, @unchecked Sendable {
     let name: String = "aerospace"
     let socketPath: String
+    private let executableURL: URL
 
-    init(socketPath: String = "/tmp/aerospace.sock") {
+    init(
+        socketPath: String = "/tmp/aerospace.sock",
+        executableURL: URL? = nil
+    ) {
         self.socketPath = socketPath
+        self.executableURL = executableURL ?? Self.resolveExecutableURL()
     }
 
     var isRunning: Bool {
@@ -15,11 +21,11 @@ final class AerospaceAdapter: WindowManagerProtocol, @unchecked Sendable {
     }
 
     func focusWorkspace(_ index: Int) async throws {
-        try await sendCommand("workspace \(index)")
+        _ = try await sendCommand("workspace \(index)")
     }
 
     func moveWindow(toWorkspace index: Int) async throws {
-        try await sendCommand("move window to workspace \(index)")
+        _ = try await sendCommand("move window to workspace \(index)")
     }
 
     func activeWorkspace() async throws -> Int {
@@ -33,7 +39,8 @@ final class AerospaceAdapter: WindowManagerProtocol, @unchecked Sendable {
     }
 
     func visibleWindows() async throws -> [WindowInfo] {
-        return []
+        let result = try await sendCommand(["list-windows", "--all", "--format", "%{window-id}|%{app-name}|%{window-title}|%{workspace}|%{window-is-focused}"])
+        return Self.parseVisibleWindows(result)
     }
 
     var onWorkspaceChange: AsyncStream<Int>? {
@@ -41,18 +48,56 @@ final class AerospaceAdapter: WindowManagerProtocol, @unchecked Sendable {
     }
 
     private func sendCommand(_ command: String) async throws -> String {
+        try await sendCommand(command.components(separatedBy: " "))
+    }
+
+    private func sendCommand(_ arguments: [String]) async throws -> String {
         guard FileManager.default.fileExists(atPath: socketPath) else {
             throw AerospaceError.notRunning
         }
         let process = Process()
-        let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/local/bin/aerospace")
-        process.arguments = command.components(separatedBy: " ")
-        process.standardOutput = pipe
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        process.standardOutput = stdout
+        process.standardError = stderr
         try process.run()
         process.waitUntilExit()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8) ?? ""
+        let outputData = stdout.fileHandleForReading.readDataToEndOfFile()
+        let errorData = stderr.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: outputData, encoding: .utf8) ?? ""
+        guard process.terminationStatus == 0 else {
+            let message = String(data: errorData, encoding: .utf8) ?? output
+            throw AerospaceError.commandFailed(message.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return output
+    }
+
+    private static func resolveExecutableURL() -> URL {
+        for path in ["/opt/homebrew/bin/aerospace", "/usr/local/bin/aerospace", "/usr/bin/aerospace"] {
+            if FileManager.default.isExecutableFile(atPath: path) {
+                return URL(fileURLWithPath: path)
+            }
+        }
+        return URL(fileURLWithPath: "/opt/homebrew/bin/aerospace")
+    }
+
+    static func parseVisibleWindows(_ output: String) -> [WindowInfo] {
+        output
+            .split(separator: "\n")
+            .compactMap { line in
+                let parts = line.split(separator: "|", omittingEmptySubsequences: false)
+                guard parts.count >= 5 else { return nil }
+                return WindowInfo(
+                    id: String(parts[0]),
+                    appName: String(parts[1]),
+                    title: String(parts[2]),
+                    frame: .zero,
+                    workspace: Int(parts[3]) ?? 0,
+                    isFocused: String(parts[4]) == "true"
+                )
+            }
     }
 }
 
