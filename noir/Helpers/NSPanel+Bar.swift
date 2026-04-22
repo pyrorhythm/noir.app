@@ -23,15 +23,14 @@ extension NSPanel {
     static func makeBarEditPanel(contentRect: NSRect) -> NSPanel {
         let panel = NSPanel(
             contentRect: contentRect,
-            styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
-        panel.title = "Edit Noir Bar"
         panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.floatingWindow)))
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = true
-        panel.titlebarAppearsTransparent = true
+        panel.isMovable = false
+        panel.isMovableByWindowBackground = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hidesOnDeactivate = false

@@ -52,6 +52,19 @@ private struct SpacesWidgetView: View {
         }
 
         do {
+            if let aerospace = wm as? AerospaceAdapter {
+                let aeroSpaces = try await aerospace.spacesWithWindows()
+                focusedWorkspace = aeroSpaces.first(where: \.isFocused)?.workspace
+                spaces = aeroSpaces.map { space in
+                    SpaceItem(
+                        name: space.workspace,
+                        isFocused: space.isFocused || space.windows.contains(where: \.isFocused),
+                        windows: space.windows
+                    )
+                }
+                return
+            }
+
             async let names = wm.workspaceNames()
             async let windows = wm.visibleWindows()
             async let focused = wm.activeWorkspace()

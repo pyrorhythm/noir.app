@@ -28,6 +28,22 @@ final class BarManager {
         CGFloat(settings.barAppearance.height)
     }
 
+    var barPanelHeight: CGFloat {
+        guard let screen = targetScreen else {
+            return barHeight + barGlassBackdropDepth
+        }
+        return panelHeight(on: screen, height: barHeight)
+    }
+
+    var barGlassBackdropDepth: CGFloat {
+        34
+    }
+
+    var barContentTopInset: CGFloat {
+        guard let screen = targetScreen else { return 0 }
+        return contentTopInset(on: screen, height: barHeight)
+    }
+
     var layout: BarLayout {
         get { settings.barLayout }
         set { settings.barLayout = newValue }
@@ -204,11 +220,12 @@ final class BarManager {
 
     private func frame(on screen: NSScreen) -> NSRect {
         let height = barHeight
+        let panelHeight = panelHeight(on: screen, height: height)
         return NSRect(
             x: screen.frame.minX + layout.horizontalMargin,
-            y: topBarMinY(on: screen, height: height),
+            y: screen.frame.maxY - panelHeight,
             width: max(240, screen.frame.width - layout.horizontalMargin * 2),
-            height: height
+            height: panelHeight
         )
     }
 
@@ -221,15 +238,18 @@ final class BarManager {
         return NSRect(x: x, y: y, width: width, height: height)
     }
 
-    private func topBarMinY(on screen: NSScreen, height: CGFloat) -> CGFloat {
+    private func reservedTopInset(on screen: NSScreen, height: CGFloat) -> CGFloat {
         let menuBarHeight = screen.frame.maxY - screen.visibleFrame.maxY
         let reservedTopHeight = max(menuBarHeight, screen.safeAreaInsets.top)
-        guard reservedTopHeight > 0 else {
-            return screen.frame.maxY - height
-        }
+        return max(0, (reservedTopHeight - height) / 2)
+    }
 
-        let reservedTopMinY = screen.frame.maxY - reservedTopHeight
-        return reservedTopMinY + max(0, (reservedTopHeight - height) / 2) + layout.verticalOffset
+    private func contentTopInset(on screen: NSScreen, height: CGFloat) -> CGFloat {
+        max(0, reservedTopInset(on: screen, height: height) + layout.verticalOffset)
+    }
+
+    private func panelHeight(on screen: NSScreen, height: CGFloat) -> CGFloat {
+        contentTopInset(on: screen, height: height) + height + barGlassBackdropDepth
     }
 
     private func currentLayoutConfig() -> LayoutConfig {

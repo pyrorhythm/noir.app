@@ -2,6 +2,14 @@ import AppKit
 import CoreGraphics
 import Foundation
 
+struct AerospaceSpace: Identifiable, Sendable, Equatable {
+    let workspace: String
+    var isFocused: Bool = false
+    var windows: [WindowInfo] = []
+
+    var id: String { workspace }
+}
+
 final class AerospaceAdapter: WindowManagerProtocol, @unchecked Sendable {
     let name: String = "aerospace"
     let socketPath: String
@@ -33,28 +41,56 @@ final class AerospaceAdapter: WindowManagerProtocol, @unchecked Sendable {
     }
 
     func activeWorkspace() async throws -> String {
-        let result = try await sendCommand(["list-workspaces", "--focused"])
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+        try await fetchFocusedSpace()?.workspace ?? ""
     }
 
     func workspaceNames() async throws -> [String] {
-        let result = try await sendCommand(["list-workspaces", "--all"])
-        return result.components(separatedBy: "\n").filter { !$0.isEmpty }
+        try await fetchSpaces().map(\.workspace)
     }
 
     func visibleWindows() async throws -> [WindowInfo] {
-        async let allWindowsOutput = sendCommand([
-            "list-windows",
-            "--all",
-            "--json",
-            "--format",
-            "%{window-id} %{app-name} %{window-title} %{workspace}",
-        ])
-        async let focusedWindowOutput = try? sendCommand(["list-windows", "--focused", "--json"])
+        try await fetchWindows()
+    }
 
-        let focusedWindowID = await focusedWindowOutput
-            .flatMap { Self.decodeAerospaceWindows($0).first?.id }
-        return try await Self.decodeAerospaceWindows(allWindowsOutput, focusedWindowID: focusedWindowID)
+    func spacesWithWindows() async throws -> [AerospaceSpace] {
+        async let spacesTask = fetchSpaces()
+        async let windowsTask = fetchWindows()
+        async let focusedSpaceTask = fetchFocusedSpace()
+        async let focusedWindowTask = fetchFocusedWindow()
+
+        var spaces = try await spacesTask
+        let windows = try await windowsTask
+        let focusedSpace = try? await focusedSpaceTask
+        let focusedWindow = try? await focusedWindowTask
+
+        for index in spaces.indices {
+            spaces[index].isFocused = spaces[index].id == focusedSpace?.id
+        }
+
+        var spacesByID = Dictionary(uniqueKeysWithValues: spaces.map { ($0.id, $0) })
+        for window in windows {
+            var mutableWindow = window
+            if mutableWindow.id == focusedWindow?.id {
+                mutableWindow.isFocused = true
+            }
+
+            if var space = spacesByID[mutableWindow.workspace], !mutableWindow.workspace.isEmpty {
+                space.windows.append(mutableWindow)
+                spacesByID[space.id] = space
+            } else if let focusedSpace, var space = spacesByID[focusedSpace.id] {
+                mutableWindow.workspace = focusedSpace.id
+                space.windows.append(mutableWindow)
+                spacesByID[space.id] = space
+            }
+        }
+
+        var result = Array(spacesByID.values)
+        for index in result.indices {
+            result[index].windows.sort { lhs, rhs in lhs.id < rhs.id }
+        }
+        return result
+            .filter { !$0.windows.isEmpty }
+            .sorted { Self.workspaceCompare($0.workspace, $1.workspace) }
     }
 
     var onWorkspaceChange: AsyncStream<Int>? {
@@ -83,6 +119,32 @@ final class AerospaceAdapter: WindowManagerProtocol, @unchecked Sendable {
             throw AerospaceError.commandFailed(message.trimmingCharacters(in: .whitespacesAndNewlines))
         }
         return output
+    }
+
+    private func fetchSpaces() async throws -> [AerospaceSpace] {
+        let output = try await sendCommand(["list-workspaces", "--all", "--json"])
+        return try Self.decodeAerospaceSpaces(output)
+    }
+
+    private func fetchWindows() async throws -> [WindowInfo] {
+        let output = try await sendCommand([
+            "list-windows",
+            "--all",
+            "--json",
+            "--format",
+            "%{window-id} %{app-name} %{window-title} %{workspace}",
+        ])
+        return Self.decodeAerospaceWindows(output)
+    }
+
+    private func fetchFocusedSpace() async throws -> AerospaceSpace? {
+        let output = try await sendCommand(["list-workspaces", "--focused", "--json"])
+        return try Self.decodeAerospaceSpaces(output).first
+    }
+
+    private func fetchFocusedWindow() async throws -> WindowInfo? {
+        let output = try await sendCommand(["list-windows", "--focused", "--json"])
+        return Self.decodeAerospaceWindows(output).first
     }
 
     nonisolated private static func isProcessRunning(_ name: String) -> Bool {
@@ -119,61 +181,60 @@ final class AerospaceAdapter: WindowManagerProtocol, @unchecked Sendable {
             }
     }
 
+    static func decodeAerospaceSpaces(_ output: String) throws -> [AerospaceSpace] {
+        let data = Data(output.utf8)
+        let decoded = try JSONDecoder().decode([AerospaceWorkspaceDTO].self, from: data)
+        return decoded.map { AerospaceSpace(workspace: $0.workspace) }
+    }
+
     static func decodeAerospaceWindows(_ output: String, focusedWindowID: String? = nil) -> [WindowInfo] {
-        guard let data = output.data(using: .utf8),
-              let objects = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        guard let windows = try? JSONDecoder().decode([AerospaceWindowDTO].self, from: Data(output.utf8))
         else {
             return parseVisibleWindows(output)
         }
 
-        return objects.compactMap { object in
-            guard let id = stringValue(object, keys: ["window-id", "window_id", "windowId"]),
-                  let appName = stringValue(object, keys: ["app-name", "app_name", "appName"]),
-                  let title = stringValue(object, keys: ["window-title", "window_title", "windowTitle"]),
-                  let workspace = stringValue(object, keys: ["workspace"])
-            else {
-                return nil
-            }
-
-            let isFocused = boolValue(object, keys: ["window-is-focused", "window_is_focused", "is_focused", "isFocused"])
-                ?? (focusedWindowID == id)
-
+        return windows.map { window in
+            let id = String(window.id)
             return WindowInfo(
                 id: id,
-                appName: appName,
-                title: title,
+                appName: window.appName ?? "",
+                title: window.title,
                 frame: .zero,
-                workspace: workspace,
-                isFocused: isFocused
+                workspace: window.workspace ?? "",
+                isFocused: focusedWindowID == id
             )
         }
     }
 
-    private static func stringValue(_ object: [String: Any], keys: [String]) -> String? {
-        for key in keys {
-            if let value = object[key] as? String {
-                return value
-            }
-            if let value = object[key] as? NSNumber {
-                return value.stringValue
-            }
+    private static func workspaceCompare(_ lhs: String, _ rhs: String) -> Bool {
+        switch (Int(lhs), Int(rhs)) {
+        case let (lhsNumber?, rhsNumber?):
+            lhsNumber < rhsNumber
+        case (_?, nil):
+            true
+        case (nil, _?):
+            false
+        case (nil, nil):
+            lhs < rhs
         }
-        return nil
     }
+}
 
-    private static func boolValue(_ object: [String: Any], keys: [String]) -> Bool? {
-        for key in keys {
-            if let value = object[key] as? Bool {
-                return value
-            }
-            if let value = object[key] as? NSNumber {
-                return value.boolValue
-            }
-            if let value = object[key] as? String {
-                return value == "true" || value == "1"
-            }
-        }
-        return nil
+private struct AerospaceWorkspaceDTO: Decodable {
+    let workspace: String
+}
+
+private struct AerospaceWindowDTO: Decodable {
+    let id: Int
+    let title: String
+    let appName: String?
+    let workspace: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id = "window-id"
+        case title = "window-title"
+        case appName = "app-name"
+        case workspace
     }
 }
 

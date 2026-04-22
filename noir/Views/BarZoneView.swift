@@ -9,19 +9,27 @@ struct BarZoneView: View {
         let appearance = settings.barAppearance
         let height = CGFloat(appearance.height)
 
-        HStack(spacing: 0) {
-            widgetGroup(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        ZStack(alignment: .top) {
+//            BarGlassBackdrop()
+//                .frame(height: barManager.barPanelHeight)
+//                .allowsHitTesting(false)
 
-            Color.clear
-                .frame(width: notchGapWidth)
-                .allowsHitTesting(false)
+            HStack(spacing: 0) {
+                widgetGroup(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-            widgetGroup(.trailing)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                Color.clear
+                    .frame(width: notchGapWidth)
+                    .allowsHitTesting(false)
+
+                widgetGroup(.trailing)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .frame(height: height)
+            .padding(.horizontal, 8)
+            .padding(.top, barManager.barContentTopInset)
         }
-        .frame(height: height)
-        .padding(.horizontal, 8)
+        .frame(height: barManager.barPanelHeight, alignment: .top)
     }
 
     private var notchGapWidth: CGFloat {
@@ -40,6 +48,29 @@ struct BarZoneView: View {
     }
 }
 
+private struct BarGlassBackdrop: View {
+    var body: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .mask {
+                LinearGradient(
+                    stops: [
+                        .init(color: .white.opacity(0.95), location: 0),
+                        .init(color: .white.opacity(0.55), location: 0.42),
+                        .init(color: .clear, location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(.white.opacity(0.08))
+                    .frame(height: 1)
+            }
+    }
+}
+
 private extension View {
     func barGlass(appearance: BarAppearance) -> some View {
         let radius = CGFloat(appearance.cornerRadius)
@@ -47,9 +78,9 @@ private extension View {
         return background {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .fill(.clear)
-                .glassEffect(.clear, in: .rect(cornerRadius: radius))
+                .glassEffect(.regular, in: .rect(cornerRadius: radius))
                 .opacity(appearance.opacity)
-                .shadow(color: .black.opacity(0.18), radius: 10, y: 1)
+//                .shadow(color: .black.opacity(0.36), radius: 3, y: 1)
         }
     }
 }
