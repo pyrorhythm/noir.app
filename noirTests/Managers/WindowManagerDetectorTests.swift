@@ -20,9 +20,13 @@ struct WindowManagerDetectorTests {
 
     @Test("Detect connects to a generic adapter for known running managers")
     func detectsGenericWindowManager() async {
-        let detector = WindowManagerDetector { name in
-            name == "yabai"
-        }
+        let detector = WindowManagerDetector(
+            processChecker: { name in name == "yabai" },
+            aerospace: AerospaceAdapter(
+                socketPath: "/tmp/nonexistent-aerospace-socket-\(UUID().uuidString)",
+                processChecker: { _ in false }
+            )
+        )
 
         await detector.detect()
 
@@ -32,13 +36,23 @@ struct WindowManagerDetectorTests {
 
     @Test("Detect clears stale adapters when no manager is running")
     func clearsStaleAdapter() async {
-        let detector = WindowManagerDetector { name in
-            name == "yabai"
-        }
+        let detector = WindowManagerDetector(
+            processChecker: { name in name == "yabai" },
+            aerospace: AerospaceAdapter(
+                socketPath: "/tmp/nonexistent-aerospace-socket-\(UUID().uuidString)",
+                processChecker: { _ in false }
+            )
+        )
         await detector.detect()
         #expect(detector.detectedWM?.name == "yabai")
 
-        let disconnectedDetector = WindowManagerDetector { _ in false }
+        let disconnectedDetector = WindowManagerDetector(
+            processChecker: { _ in false },
+            aerospace: AerospaceAdapter(
+                socketPath: "/tmp/nonexistent-aerospace-socket-\(UUID().uuidString)",
+                processChecker: { _ in false }
+            )
+        )
         await disconnectedDetector.detect()
 
         #expect(disconnectedDetector.connectionState == .disconnected)

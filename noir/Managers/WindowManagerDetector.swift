@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 @MainActor
@@ -5,10 +6,15 @@ import Foundation
 final class WindowManagerDetector {
     var detectedWM: (any WindowManagerProtocol)?
     var connectionState: ConnectionState = .disconnected
-    private let processChecker: (String) -> Bool
+    private let processChecker: @Sendable (String) -> Bool
+    private let aerospace: AerospaceAdapter
 
-    init(processChecker: @escaping (String) -> Bool = WindowManagerDetector.isProcessRunning) {
+    init(
+        processChecker: @escaping @Sendable (String) -> Bool = WindowManagerDetector.isProcessRunning,
+        aerospace: AerospaceAdapter? = nil
+    ) {
         self.processChecker = processChecker
+        self.aerospace = aerospace ?? AerospaceAdapter(processChecker: processChecker)
     }
 
     enum ConnectionState: Sendable, Equatable {
@@ -20,7 +26,6 @@ final class WindowManagerDetector {
     func detect() async {
         connectionState = .reconnecting
 
-        let aerospace = AerospaceAdapter()
         let aerospaceIsRunning = await aerospace.isRunning
         if processChecker(aerospace.name) || aerospaceIsRunning {
             detectedWM = aerospace
@@ -39,15 +44,10 @@ final class WindowManagerDetector {
     }
 
     nonisolated private static func isProcessRunning(_ name: String) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        process.arguments = ["-x", name]
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
+        NSWorkspace.shared.runningApplications.contains { app in
+            app.executableURL?.deletingPathExtension().lastPathComponent == name
+                || app.localizedName?.localizedCaseInsensitiveCompare(name) == .orderedSame
+                || app.bundleIdentifier?.localizedCaseInsensitiveContains(name) == true
         }
     }
 }
@@ -63,15 +63,15 @@ private final class DetectedWindowManagerAdapter: WindowManagerProtocol, @unchec
         get async { true }
     }
 
-    func focusWorkspace(_ index: Int) async throws {
+    func focusWorkspace(_ workspace: String) async throws {
         throw WindowManagerDetectorError.unsupportedAdapter(name)
     }
 
-    func moveWindow(toWorkspace index: Int) async throws {
+    func moveWindow(toWorkspace workspace: String) async throws {
         throw WindowManagerDetectorError.unsupportedAdapter(name)
     }
 
-    func activeWorkspace() async throws -> Int {
+    func activeWorkspace() async throws -> String {
         throw WindowManagerDetectorError.unsupportedAdapter(name)
     }
 

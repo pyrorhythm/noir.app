@@ -59,9 +59,9 @@ private final class PreviewWindowManager: WindowManagerProtocol, @unchecked Send
         get async { true }
     }
 
-    func focusWorkspace(_ index: Int) async throws {}
-    func moveWindow(toWorkspace index: Int) async throws {}
-    func activeWorkspace() async throws -> Int { 1 }
+    func focusWorkspace(_ workspace: String) async throws {}
+    func moveWindow(toWorkspace workspace: String) async throws {}
+    func activeWorkspace() async throws -> String { "1" }
     func workspaceNames() async throws -> [String] { ["1", "2", "3"] }
     func visibleWindows() async throws -> [WindowInfo] { [] }
     var onWorkspaceChange: AsyncStream<Int>? { nil }

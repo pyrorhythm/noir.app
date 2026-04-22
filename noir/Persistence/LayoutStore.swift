@@ -15,7 +15,7 @@ struct LayoutConfig: Codable, Sendable, Equatable {
     )
 }
 
-// Custom encoding for BarZone keys (enum as dictionary key)
+/// Custom encoding for BarZone keys (enum as dictionary key)
 extension LayoutConfig {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: BarZoneCodingKey.self)

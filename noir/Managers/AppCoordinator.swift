@@ -43,7 +43,7 @@ final class AppCoordinator {
         guard !hasStarted else { return }
         hasStarted = true
 
-        barManager.createPanels()
+        barManager.createPanels(wmDetector: wmDetector)
         mediaKeyMonitor.start()
 
         Task {
@@ -60,8 +60,11 @@ final class AppCoordinator {
 
     private func loadLayout() {
         let storedLayout = (try? layoutStore.load()) ?? .default
-        let layout = storedLayout.isEmpty ? NoirWidgetCatalog.defaultLayout : storedLayout
+        let layout = storedLayout.isEmpty ? NoirWidgetCatalog.defaultLayout : storedLayout.withSpacesWidgetIfMissing()
         barManager.apply(layoutConfig: layout)
+        if layout != storedLayout {
+            try? layoutStore.save(layout)
+        }
     }
 
     private func wirePersistence() {
@@ -139,5 +142,28 @@ private final class WelcomeWindowDelegate: NSObject, NSWindowDelegate {
 private extension LayoutConfig {
     var isEmpty: Bool {
         zones.values.allSatisfy { $0.widgets.isEmpty }
+    }
+
+    func withSpacesWidgetIfMissing() -> LayoutConfig {
+        guard zones.values.flatMap(\.widgets).contains(where: { $0.type == "Spaces" }) == false else {
+            return self
+        }
+
+        var layout = self
+        var top = layout.zones[.top] ?? ZoneConfig(widgets: [])
+        let leadingIndex = top.widgets.filter { $0.group == .leading }.count
+        top.widgets.append(
+            WidgetConfig(
+                id: UUID(uuidString: "44444444-4444-4444-4444-444444444444") ?? UUID(),
+                type: "Spaces",
+                size: .large,
+                zone: .top,
+                group: .leading,
+                index: leadingIndex,
+                settings: [:]
+            )
+        )
+        layout.zones[.top] = top
+        return layout
     }
 }

@@ -4,11 +4,10 @@ import SwiftUI
 @MainActor
 @Observable
 final class BarManager {
-    var zones: [BarZone] = [.top, .bottom]
-    var layout: BarLayout = .default
+    var zones: [BarZone] = [.top]
     var isEditing: Bool = false {
         didSet {
-            updatePanelInteractivity()
+            updateEditPanelVisibility()
         }
     }
 
@@ -18,13 +17,20 @@ final class BarManager {
     var onLayoutChange: ((LayoutConfig) -> Void)?
 
     private var widgetConfigs: [UUID: WidgetConfig] = [:]
-    private var panels: [BarZone: NSPanel] = [:]
+    private var panel: NSPanel?
+    private var editPanel: NSPanel?
+    private var wmDetector: WindowManagerDetector?
     private var observationStarted = false
     private var displayObserver: NSObjectProtocol?
     private var isApplyingLayout = false
 
     var barHeight: CGFloat {
         CGFloat(settings.barAppearance.height)
+    }
+
+    var layout: BarLayout {
+        get { settings.barLayout }
+        set { settings.barLayout = newValue }
     }
 
     var hasNotch: Bool {
@@ -71,8 +77,23 @@ final class BarManager {
         publishLayoutChange()
     }
 
+    func addWidget(type: String, group: WidgetGroup) {
+        let descriptor = widgetRegistry.registeredWidgets.first { $0.typeName == type }
+        let config = WidgetConfig(
+            id: UUID(),
+            type: type,
+            size: descriptor?.defaultSize ?? .medium,
+            zone: .top,
+            group: group,
+            index: widgets(for: .top, group: group).count,
+            settings: [:]
+        )
+        addWidget(config)
+    }
+
     func removeWidget(_ config: WidgetConfig) {
         widgetConfigs.removeValue(forKey: config.id)
+        normalizeIndices(in: config.zone, group: config.group)
         publishLayoutChange()
     }
 
@@ -81,6 +102,20 @@ final class BarManager {
         movedConfig.zone = dest
         movedConfig.index = index
         widgetConfigs[movedConfig.id] = movedConfig
+        normalizeIndices(in: source, group: config.group)
+        normalizeIndices(in: dest, group: movedConfig.group)
+        publishLayoutChange()
+    }
+
+    func moveWidget(_ id: UUID, to group: WidgetGroup, at index: Int) {
+        guard var movedConfig = widgetConfigs[id] else { return }
+        let sourceGroup = movedConfig.group
+        movedConfig.zone = .top
+        movedConfig.group = group
+        movedConfig.index = index
+        widgetConfigs[id] = movedConfig
+        normalizeIndices(in: .top, group: sourceGroup)
+        normalizeIndices(in: .top, group: group)
         publishLayoutChange()
     }
 
@@ -95,36 +130,35 @@ final class BarManager {
         isApplyingLayout = false
     }
 
-    func createPanels() {
+    func createPanels(wmDetector: WindowManagerDetector? = nil) {
         guard let screen = targetScreen else { return }
+        guard panel == nil else { return }
+        self.wmDetector = wmDetector
         startObservingDisplays()
 
-        for zone in zones {
-            if panels[zone] != nil { continue }
+        let panelRect = frame(on: screen)
+        let detector = wmDetector ?? WindowManagerDetector()
 
-            let panelRect = frame(for: zone, on: screen)
-
-            let panel = NSPanel.makeBarPanel(contentRect: panelRect)
-            let hostingController = NSHostingController(
-                rootView: BarZoneView(zone: zone)
-                    .environment(self)
-                    .environment(settings)
-                    .environment(notchManager)
-                    .environment(widgetRegistry)
-            )
-            panel.contentViewController = hostingController
-            panel.setFrame(panelRect, display: true)
-            panel.ignoresMouseEvents = !isEditing
-            panel.orderFrontRegardless()
-            panels[zone] = panel
-        }
+        let panel = NSPanel.makeBarPanel(contentRect: panelRect)
+        let hostingController = NSHostingController(
+            rootView: BarZoneView(zone: .top)
+                .environment(self)
+                .environment(settings)
+                .environment(detector)
+                .environment(notchManager)
+                .environment(widgetRegistry)
+        )
+        panel.contentViewController = hostingController
+        panel.setFrame(panelRect, display: true)
+        panel.orderFrontRegardless()
+        self.panel = panel
     }
 
     func destroyPanels() {
-        for (_, panel) in panels {
-            panel.close()
-        }
-        panels.removeAll()
+        panel?.close()
+        panel = nil
+        editPanel?.close()
+        editPanel = nil
         if let displayObserver {
             NotificationCenter.default.removeObserver(displayObserver)
             self.displayObserver = nil
@@ -140,6 +174,7 @@ final class BarManager {
     private func observeSettingsChanges() {
         withObservationTracking {
             _ = settings.barAppearance
+            _ = settings.barLayout
         } onChange: {
             Task { @MainActor in
                 self.updatePanelFrames()
@@ -150,15 +185,8 @@ final class BarManager {
 
     private func updatePanelFrames() {
         guard let screen = targetScreen else { return }
-        for (zone, panel) in panels {
-            panel.setFrame(frame(for: zone, on: screen), display: true)
-        }
-    }
-
-    private func updatePanelInteractivity() {
-        for panel in panels.values {
-            panel.ignoresMouseEvents = !isEditing
-        }
+        panel?.setFrame(frame(on: screen), display: true)
+        editPanel?.setFrame(editFrame(on: screen), display: true)
     }
 
     private func startObservingDisplays() {
@@ -174,30 +202,39 @@ final class BarManager {
         }
     }
 
-    private func frame(for zone: BarZone, on screen: NSScreen) -> NSRect {
-        let visibleFrame = screen.visibleFrame
+    private func frame(on screen: NSScreen) -> NSRect {
         let height = barHeight
-        switch zone {
-        case .top:
-            return NSRect(
-                x: visibleFrame.minX,
-                y: visibleFrame.maxY - height,
-                width: visibleFrame.width,
-                height: height
-            )
-        case .bottom:
-            return NSRect(
-                x: visibleFrame.minX,
-                y: visibleFrame.minY,
-                width: visibleFrame.width,
-                height: height
-            )
+        return NSRect(
+            x: screen.frame.minX + layout.horizontalMargin,
+            y: topBarMinY(on: screen, height: height),
+            width: max(240, screen.frame.width - layout.horizontalMargin * 2),
+            height: height
+        )
+    }
+
+    private func editFrame(on screen: NSScreen) -> NSRect {
+        let width: CGFloat = min(760, max(520, screen.visibleFrame.width - 80))
+        let height: CGFloat = 330
+        let barFrame = frame(on: screen)
+        let x = screen.visibleFrame.midX - width / 2
+        let y = max(screen.visibleFrame.minY + 24, barFrame.minY - height - 16)
+        return NSRect(x: x, y: y, width: width, height: height)
+    }
+
+    private func topBarMinY(on screen: NSScreen, height: CGFloat) -> CGFloat {
+        let menuBarHeight = screen.frame.maxY - screen.visibleFrame.maxY
+        let reservedTopHeight = max(menuBarHeight, screen.safeAreaInsets.top)
+        guard reservedTopHeight > 0 else {
+            return screen.frame.maxY - height
         }
+
+        let reservedTopMinY = screen.frame.maxY - reservedTopHeight
+        return reservedTopMinY + max(0, (reservedTopHeight - height) / 2) + layout.verticalOffset
     }
 
     private func currentLayoutConfig() -> LayoutConfig {
         var zones: [BarZone: ZoneConfig] = [:]
-        for zone in BarZone.allCases {
+        for zone in self.zones {
             zones[zone] = ZoneConfig(widgets: widgets(for: zone))
         }
         return LayoutConfig(zones: zones)
@@ -207,5 +244,36 @@ final class BarManager {
         guard !isApplyingLayout else { return }
         let config = currentLayoutConfig()
         onLayoutChange?(config)
+    }
+
+    private func updateEditPanelVisibility() {
+        if isEditing {
+            createEditPanel()
+        } else {
+            editPanel?.close()
+            editPanel = nil
+        }
+    }
+
+    private func createEditPanel() {
+        guard editPanel == nil, let screen = targetScreen else { return }
+        let editPanel = NSPanel.makeBarEditPanel(contentRect: editFrame(on: screen))
+        editPanel.contentViewController = NSHostingController(
+            rootView: WidgetEditPanelView()
+                .environment(self)
+                .environment(settings)
+                .environment(notchManager)
+                .environment(widgetRegistry)
+        )
+        editPanel.orderFrontRegardless()
+        self.editPanel = editPanel
+    }
+
+    private func normalizeIndices(in zone: BarZone, group: WidgetGroup) {
+        for (index, widget) in widgets(for: zone, group: group).enumerated() {
+            var normalized = widget
+            normalized.index = index
+            widgetConfigs[widget.id] = normalized
+        }
     }
 }

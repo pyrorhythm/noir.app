@@ -20,6 +20,7 @@ struct WMSecuritySettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .controlSize(.small)
     }
 
     private var statusTitle: String {

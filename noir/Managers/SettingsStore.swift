@@ -11,6 +11,12 @@ final class SettingsStore {
         }
     }
 
+    var barLayout: BarLayout {
+        didSet {
+            save(barLayout, forKey: Keys.barLayout)
+        }
+    }
+
     var selectedWM: String? {
         didSet {
             defaults.set(selectedWM, forKey: Keys.windowManager)
@@ -21,6 +27,7 @@ final class SettingsStore {
         self.defaults = defaults
         self.selectedWM = defaults.string(forKey: Keys.windowManager)
         self.barAppearance = Self.loadBarAppearance(from: defaults)
+        self.barLayout = Self.load(BarLayout.self, from: defaults, key: Keys.barLayout) ?? .default
     }
 
     private func save(_ value: some Encodable, forKey key: String) {
@@ -48,8 +55,14 @@ final class SettingsStore {
         return migrated
     }
 
+    private static func load<T: Decodable>(_ type: T.Type, from defaults: UserDefaults, key: String) -> T? {
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
+    }
+
     private enum Keys {
         static let barAppearance = "settings.bar.appearance"
+        static let barLayout = "settings.bar.layout"
         static let windowManager = "settings.windowManager"
         static let legacyBarHeight = "settings.bar.height"
         static let legacyBarCornerRadius = "settings.bar.cornerRadius"

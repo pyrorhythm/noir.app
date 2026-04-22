@@ -27,9 +27,11 @@ struct NoirApp: App {
         .defaultSize(width: 560, height: 420)
         .windowResizability(.contentSize)
 
-        Settings {
+        Window("Settings", id: "settings") {
             SettingsView()
                 .noirEnvironment(coordinator)
         }
+        .defaultSize(width: 680, height: 430)
+        .windowResizability(.contentSize)
     }
 }

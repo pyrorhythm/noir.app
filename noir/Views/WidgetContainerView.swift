@@ -5,28 +5,43 @@ struct WidgetContainerView: View {
     @Environment(BarManager.self) var barManager
     @Environment(SettingsStore.self) var settings
     @Environment(WidgetRegistry.self) var registry
+    @State private var isPopoverPresented = false
 
     var body: some View {
         Group {
             if let widget = registry.createWidget(ofType: config.type, size: config.size) {
-                AnyNoirWidgetView(widget: widget)
-                    .frame(height: CGFloat(settings.barAppearance.height) - 4)
+                widgetView(widget)
             } else {
                 Image(systemName: "questionmark.square")
                     .foregroundStyle(.secondary)
             }
         }
         .if(barManager.isEditing) { view in
-            view.overlay(alignment: .topTrailing) {
-                Button {
-                    barManager.removeWidget(config)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            view
+                .padding(.horizontal, 4)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                 }
-                .buttonStyle(.plain)
-            }
+        }
+    }
+
+    @ViewBuilder
+    private func widgetView(_ widget: any NoirWidget) -> some View {
+        let content = AnyNoirWidgetView(widget: widget)
+            .frame(height: CGFloat(settings.barAppearance.height) - 4)
+
+        if let popover = widget.popover {
+            content
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    isPopoverPresented.toggle()
+                }
+                .popover(isPresented: $isPopoverPresented) {
+                    popover
+                }
+        } else {
+            content
         }
     }
 }

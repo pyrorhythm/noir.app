@@ -8,8 +8,9 @@ struct AppearanceSettingsView: View {
             Section("Bar") {
                 ForEach(BarAppearance.controls) { control in
                     LabeledContent {
-                        HStack {
+                        HStack(spacing: 10) {
                             Slider(value: binding(for: control), in: control.range, step: control.step)
+                                .frame(width: 180)
                             Text(settings.barAppearance[keyPath: control.value], format: control.format)
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
@@ -22,6 +23,7 @@ struct AppearanceSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .controlSize(.small)
     }
 
     private func binding(for control: BarAppearanceControl) -> Binding<Double> {

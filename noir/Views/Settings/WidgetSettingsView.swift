@@ -19,5 +19,6 @@ struct WidgetSettingsView: View {
             }
             .padding(.vertical, 4)
         }
+        .frame(height: 220)
     }
 }

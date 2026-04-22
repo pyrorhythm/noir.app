@@ -7,8 +7,8 @@ import Foundation
 struct SmokeTests {
     @Test("BarManager creates with default state")
     func barManagerDefaults() {
-        let manager = BarManager()
-        #expect(manager.zones == [.top, .bottom])
+        let manager = BarManager(settings: SettingsStore(defaults: UserDefaults(suiteName: "NoirSmokeTests-\(UUID().uuidString)")!))
+        #expect(manager.zones == [.top])
         #expect(manager.isEditing == false)
         #expect(manager.barHeight == 28)
     }

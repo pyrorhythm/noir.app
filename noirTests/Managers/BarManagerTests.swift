@@ -7,10 +7,10 @@ import Foundation
 struct BarManagerTests {
     @Test("Initial state has default layout")
     func initialState() {
-        let manager = BarManager()
+        let manager = BarManager(settings: SettingsStore(defaults: UserDefaults(suiteName: "NoirBarManagerTests-\(UUID().uuidString)")!))
         #expect(manager.barHeight == 28)
         #expect(manager.isEditing == false)
-        #expect(manager.zones == [.top, .bottom])
+        #expect(manager.zones == [.top])
     }
 
     @Test("Add widget to zone")

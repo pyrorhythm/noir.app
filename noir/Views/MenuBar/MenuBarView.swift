@@ -3,7 +3,7 @@ import SwiftUI
 struct MenuBarView: View {
     @Environment(BarManager.self) var barManager
     @Environment(WindowManagerDetector.self) var wmDetector
-    @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         GlassEffectContainer {
@@ -28,7 +28,7 @@ struct MenuBarView: View {
                 VStack(spacing: 8) {
                     Button {
                         NSApp.activate(ignoringOtherApps: true)
-                        openSettings()
+                        openWindow(id: "settings")
                     } label: {
                         Label("Open Settings", systemImage: "gear")
                             .frame(maxWidth: .infinity, alignment: .leading)

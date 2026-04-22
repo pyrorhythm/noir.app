@@ -5,6 +5,6 @@ struct WindowInfo: Identifiable, Sendable, Equatable {
     let appName: String
     let title: String
     let frame: CGRect
-    let workspace: Int
+    let workspace: String
     let isFocused: Bool
 }

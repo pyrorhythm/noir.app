@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @State private var selection: SettingsPage? = .appearance
+    @SceneStorage("settings.selection") private var selection = SettingsPage.appearance
 
     var body: some View {
         NavigationSplitView {
@@ -11,11 +11,20 @@ struct SettingsView: View {
             }
             .listStyle(.sidebar)
             .navigationTitle("Noir")
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 220)
         } detail: {
-            (selection ?? .appearance).content
-                .navigationTitle((selection ?? .appearance).title)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(selection.title)
+                        .font(.title2.weight(.semibold))
+
+                    selection.content
+                }
+                .frame(width: 460, alignment: .topLeading)
+                .padding(24)
+            }
         }
-        .frame(width: 640, height: 420)
+        .frame(width: 680, height: 430)
     }
 }
 
